@@ -18,7 +18,8 @@ import javax.sql.DataSource;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(entityManagerFactoryRef = "centralEntityManagerFactory",
-basePackages = {"com.hospital.hospitalapp.central.repository"})
+basePackages = {"com.hospital.hospitalapp.central.repository"},
+transactionManagerRef = "centralTransactionManager")
 public class CentralDbConfig {
 
     @Bean(name = "centralDataSource")

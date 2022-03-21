@@ -19,7 +19,8 @@ import javax.sql.DataSource;
 @Configuration
 @EnableTransactionManagement
 @EnableJpaRepositories(entityManagerFactoryRef = "EhrEntityManagerFactory",
-basePackages = {"com.hospital.hospitalapp.ehr.repository"})
+basePackages = {"com.hospital.hospitalapp.ehr.repository"},
+transactionManagerRef = "transactionManager")
 public class EhrDbConfig {
 
     @Primary
@@ -45,7 +46,7 @@ public class EhrDbConfig {
     }
 
     @Primary
-    @Bean(name = "EhrTransactionManager")
+    @Bean(name = "transactionManager")
     public PlatformTransactionManager barTransactionManager(
             @Qualifier("EhrEntityManagerFactory") EntityManagerFactory
                     barEntityManagerFactory
