@@ -2,10 +2,16 @@ package com.hospital.hospitalapp.service;
 
 import com.hospital.hospitalapp.DTO.*;
 import com.hospital.hospitalapp.central.entity.Consent_request;
+import com.hospital.hospitalapp.central.entity.Doctor_info;
 import com.hospital.hospitalapp.central.entity.PatientInfo;
 import com.hospital.hospitalapp.central.repository.Consent_request_repo;
+import com.hospital.hospitalapp.central.repository.Doctor_info_repo;
+import com.hospital.hospitalapp.central.repository.Ehr_info_repo;
 import com.hospital.hospitalapp.central.repository.Patient_Info_Repo;
+import com.hospital.hospitalapp.ehr.entity.Encounter_info;
+import com.hospital.hospitalapp.ehr.entity.Episodes_info;
 import com.hospital.hospitalapp.ehr.entity.Op_Record_info;
+import com.hospital.hospitalapp.ehr.repository.Encounter_info_repo;
 import com.hospital.hospitalapp.ehr.repository.Episodes_info_repo;
 import com.hospital.hospitalapp.ehr.repository.Op_Record_info_repo;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,6 +38,9 @@ public class HospitalAppService {
     @Autowired
     private Patient_Info_Repo patient_info_repo;
 
+    @Autowired
+    private Doctor_info_repo doctor_info_repo;
+
     @Value("${hospital.id}")
     private String hospital_id;
 
@@ -55,6 +64,12 @@ public class HospitalAppService {
 
     @Autowired
     private Op_Record_info_repo op_record_info_repo;
+
+    @Autowired
+    private Encounter_info_repo encounter_info_repo;
+
+    @Autowired
+    private Ehr_info_repo ehr_info_repo;
 
     private String consentManagerToken;
 
@@ -147,13 +162,13 @@ public class HospitalAppService {
         List<EpisodesDTO> episodesDTOList=new ArrayList<>();
         for(EpisodesDetails episodesDetails:validateConsentDTO.getEpisodes()){
             EpisodesDTO episodesDTO=new EpisodesDTO();
-            episodesDTO.setEpisode_id(episodesDetails.getEpisodeId());
-            episodesDTO.setEpisode_name(episodes_info_repo.getEpisodeNameById(episodesDetails.getEpisodeId()));
+            episodesDTO.setEpisodeId(episodesDetails.getEpisodeId());
+            episodesDTO.setEpisodeName(episodes_info_repo.getEpisodeNameById(episodesDetails.getEpisodeId()));
             List<EncountersDTO> encountersDTOList=new ArrayList<>();
             System.out.print("Encounter:"+episodesDetails.getEncounterDetails().size());
             for(EncounterDetails encounterDetails:episodesDetails.getEncounterDetails()){
                 EncountersDTO encountersDTO=new EncountersDTO();
-                encountersDTO.setEncounter_id(encounterDetails.getEncounterId());
+                encountersDTO.setEncounterId(encounterDetails.getEncounterId());
                 List<Op_Record_info> ops_recordsList=op_record_info_repo.getOpRecords(encounterDetails.getEncounterId());
                 System.out.println("Db list size:"+ops_recordsList.size());
                 List<Ops_recordsDTO> ops_recordsDTOList=new ArrayList<>();
@@ -165,16 +180,72 @@ public class HospitalAppService {
                     String date=null;
                     date=simpleDateFormat.format(op_record_info.getCreated_dt());
                     ops_recordsDTO.setTimestamp(date);
-                    ops_recordsDTO.setRecord_details(op_record_info.getRecord_details());
+                    ops_recordsDTO.setRecordDetails(op_record_info.getRecord_details());
                     ops_recordsDTOList.add(ops_recordsDTO);
                 }
-                encountersDTO.setOps_recordsDTOList(ops_recordsDTOList);
+                encountersDTO.setOp_records(ops_recordsDTOList);
+                String doctorId=encounter_info_repo.getEncounterById(encounterDetails.getEncounterId()).getDoctor_id();
+                String doctorName=doctor_info_repo.getDoctorById(doctorId).getDoctor_name();
+                encountersDTO.setDoctorName(doctorName);
                 encountersDTOList.add(encountersDTO);
             }
-            episodesDTO.setEncountersDTOList(encountersDTOList);
+            episodesDTO.setEncounters(encountersDTOList);
             episodesDTOList.add(episodesDTO);
         }
         ehrdto.setEpisodesDTOList(episodesDTOList);
         return ehrdto;
+    }
+
+    public List<EpisodesDTO> fetchEntireEhrOfPatient(String patientId){
+        List<EpisodesDTO> episodes=new ArrayList<>();
+        String ehr_id=ehr_info_repo.getEhrIdByPatientId(patientId);
+        List<Episodes_info> episodes_infos= episodes_info_repo.getEpisodesByEhrId(ehr_id);
+        if(episodes_infos!=null){
+            for(Episodes_info episodes_info:episodes_infos){
+                System.out.println("Episodes");
+                EpisodesDTO episodesDTO=new EpisodesDTO();
+                episodesDTO.setEpisodeId(episodes_info.getEpisode_id());
+                episodesDTO.setEpisodeName(episodes_info.getEpisode_name());
+                List<Encounter_info> encounter_infos=encounter_info_repo.getEncountersByEpisodeId(episodes_info.getEpisode_id());
+                List<EncountersDTO> encounters=new ArrayList<>();
+                if(encounter_infos!=null){
+                    for(Encounter_info encounter_info:encounter_infos){
+                        System.out.println("Encounters");
+                        EncountersDTO encountersDTO=new EncountersDTO();
+                        encountersDTO.setEncounterId(encounter_info.getEncounter_id());
+                        String doctorName=doctor_info_repo.getDoctorById(encounter_info.getDoctor_id()).getDoctor_name();
+                        encountersDTO.setDoctorName(doctorName);
+                        List<Ops_recordsDTO> op_records=new ArrayList<>();
+                        List<Op_Record_info> op_record_infos=op_record_info_repo.getOpRecords(encounter_info.getEncounter_id());
+                        if(op_record_infos!=null){
+                            for(Op_Record_info op_record_info:op_record_infos){
+                                System.out.println("OP records");
+                                Ops_recordsDTO ops_recordsDTO=new Ops_recordsDTO();
+                                ops_recordsDTO.setOp_record_id(op_record_info.getOp_record_id());
+                                ops_recordsDTO.setDiagnosis(op_record_info.getDiagnosis());
+                                ops_recordsDTO.setRecordDetails(op_record_info.getRecord_details());
+                                SimpleDateFormat simpleDateFormat=new SimpleDateFormat("dd-MM-yyyy hh:mm:ss");
+                                String date=simpleDateFormat.format(op_record_info.getCreated_dt());
+                                ops_recordsDTO.setTimestamp(date);
+                                op_records.add(ops_recordsDTO);
+                            }
+                        }
+                        encountersDTO.setOp_records(op_records);
+                        encounters.add(encountersDTO);
+                    }
+                }
+                episodesDTO.setEncounters(encounters);
+                episodes.add(episodesDTO);
+            }
+        }
+        return episodes;
+    }
+
+    public PatientInfo getPatientById(String patientId){
+        return patient_info_repo.getPatientNames(patientId);
+    }
+
+    public Doctor_info getDoctorById(String doctorId){
+        return doctor_info_repo.getDoctorById(doctorId);
     }
 }

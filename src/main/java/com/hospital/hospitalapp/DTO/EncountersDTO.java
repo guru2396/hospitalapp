@@ -7,6 +7,7 @@ import java.util.List;
 
 @Data
 public class EncountersDTO {
-    List<Ops_recordsDTO> ops_recordsDTOList;
-    private String encounter_id;
+    private List<Ops_recordsDTO> op_records;
+    private String encounterId;
+    private String doctorName;
 }

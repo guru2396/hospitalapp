@@ -6,7 +6,7 @@ import lombok.Data;
 public class Ops_recordsDTO {
     private String op_record_id;
     private String diagnosis;
-    private String record_details;
+    private String recordDetails;
     private String timestamp;
 
 }

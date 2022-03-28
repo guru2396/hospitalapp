@@ -6,7 +6,7 @@ import java.util.List;
 
 @Data
 public class EpisodesDTO {
-    private String episode_id;
-    private String episode_name;
-    List<EncountersDTO> encountersDTOList;
+    private String episodeId;
+    private String episodeName;
+    List<EncountersDTO> encounters;
 }
