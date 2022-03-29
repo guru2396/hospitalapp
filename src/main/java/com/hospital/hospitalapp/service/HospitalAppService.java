@@ -21,6 +21,8 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
@@ -40,6 +42,8 @@ public class HospitalAppService {
 
     @Autowired
     private Doctor_info_repo doctor_info_repo;
+
+
 
     @Value("${hospital.id}")
     private String hospital_id;
@@ -72,6 +76,8 @@ public class HospitalAppService {
     private Ehr_info_repo ehr_info_repo;
 
     private String consentManagerToken;
+
+    PasswordEncoder passwordEncoder;
 
     private String getToken(){
         if(consentManagerToken==null)
@@ -248,4 +254,73 @@ public class HospitalAppService {
     public Doctor_info getDoctorById(String doctorId){
         return doctor_info_repo.getDoctorById(doctorId);
     }
+
+
+
+    public String loginAdmin(AdminLoginDTO adminLoginDto) {
+
+        String email = adminLoginDto.getAdmin_email();
+        String password = adminLoginDto.getAdmin_password();
+        System.out.println(email + " " + password);
+        JwtService jwtService = new JwtService();
+        if (email.equals("h1admin@gmail.com") && password.equals("password")) {
+            //String patient_id = patient_info_repo.findId(email);
+            String token = jwtService.createToken("1");
+            return token;
+        } else {
+            /*
+            Unmatched is returned if passwords are not matched.This is used as a key to know whether passwords matched or not
+            Donot change the returned value
+            */
+            return "Unmatched";
+        }
+    }
+
+    public String addDoctor(DoctorRegistrationDTO doctorRegistrationDto){
+
+
+        String email = doctorRegistrationDto.getDoctor_email();
+
+        //We have to check whether the admin is adding or someone else is adding the data
+        System.out.println(email);
+        Doctor_info doctor_info = new Doctor_info();
+        doctor_info.setDoctor_email(doctorRegistrationDto.getDoctor_email());
+
+        doctor_info.setDoctor_id("DOC_001"); // String id="PAT_"+UUID.randomUUID().toString();
+        doctor_info_repo.save(doctor_info);
+
+        return doctor_info.getDoctor_id();
+    }
+
+
+
+    public String registerDoctor(DoctorRegistrationDTO doctorRegistrationDto){
+        Doctor_info doctor_info=new Doctor_info();
+        String id = doctorRegistrationDto.getDoctor_id();
+        String email = doctorRegistrationDto.getDoctor_email();
+
+        //check if the doctor with the entered id and email exist or not
+        String ret_email = doctor_info_repo.findDoctor(id,email);
+        if(email.equals(ret_email)){
+            //doctor with the id exist hence we can now procede updating the values
+            String name = doctorRegistrationDto.getDoctor_name();
+            String contact = doctorRegistrationDto.getDoctor_contact();
+            String speciality = doctorRegistrationDto.getDoctor_speciality();
+
+            this.passwordEncoder = new BCryptPasswordEncoder();
+            String hash_password = this.passwordEncoder.encode(doctorRegistrationDto.getDoctor_password());
+             //saving hashed password in database;
+
+            doctor_info_repo.updateDoctorDetails(name,contact,speciality,hash_password,id,email);
+            return "Success";
+        }
+        else{
+            return "Failure";
+        }
+
+
+    }
+
+
+
 }
