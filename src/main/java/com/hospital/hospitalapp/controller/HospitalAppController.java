@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
+@CrossOrigin(origins = {"*"})
 public class HospitalAppController {
     @Autowired
     private JwtService jwtService;
@@ -70,9 +71,28 @@ public class HospitalAppController {
                 return response;
             }
         }
-        else{
-            ResponseEntity<String> response=new ResponseEntity<>("Unauthorized",HttpStatus.UNAUTHORIZED);
+        else {
+            ResponseEntity<String> response = new ResponseEntity<>("Unauthorized", HttpStatus.UNAUTHORIZED);
             return response;
         }
     }
+
+    @PostMapping(value="/admin-login")
+    public ResponseEntity<?> adminLogin(@RequestBody AdminLoginDTO adminLoginDto){
+        String token= hospitalAppService.loginAdmin(adminLoginDto);
+        return ResponseEntity.ok(token);
+    }
+
+    @PostMapping(value="/add-doctor")
+    public ResponseEntity<?> addDoctor(@RequestBody DoctorRegistrationDTO doctorRegistrationDto){
+        String id = hospitalAppService.addDoctor(doctorRegistrationDto);
+        return ResponseEntity.ok(id);
+    }
+
+    @PostMapping(value="/register-doctor")
+    public ResponseEntity<?> registerDoctor(@RequestBody DoctorRegistrationDTO doctorRegistrationDto){
+        String patientId= hospitalAppService.registerDoctor(doctorRegistrationDto);
+        return ResponseEntity.ok(patientId);
+    }
+
 }

@@ -17,7 +17,7 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
     @Override
     protected void configure(HttpSecurity httpSecurity) throws Exception{
         httpSecurity.csrf().disable()
-                .authorizeRequests().antMatchers("/patient-authenticate","/admin-login").permitAll()
+                .authorizeRequests().antMatchers("/patient-authenticate","/admin-login","/add-doctor","/register-doctor").permitAll()
                 .anyRequest().authenticated()
                 .and().sessionManagement()
                 .sessionCreationPolicy(SessionCreationPolicy.STATELESS);
@@ -26,6 +26,6 @@ public class SecurityConfig extends WebSecurityConfigurerAdapter {
 
     @Override
     public void configure(WebSecurity webSecurity){
-        webSecurity.ignoring().antMatchers("/patient-authenticate","/admin-login");
+        webSecurity.ignoring().antMatchers("/patient-authenticate","/admin-login","/add-doctor","/register-doctor");
     }
 }
