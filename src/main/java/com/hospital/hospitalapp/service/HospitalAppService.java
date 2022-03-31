@@ -8,9 +8,11 @@ import com.hospital.hospitalapp.central.repository.Consent_request_repo;
 import com.hospital.hospitalapp.central.repository.Doctor_info_repo;
 import com.hospital.hospitalapp.central.repository.Ehr_info_repo;
 import com.hospital.hospitalapp.central.repository.Patient_Info_Repo;
+import com.hospital.hospitalapp.ehr.entity.Access_logs;
 import com.hospital.hospitalapp.ehr.entity.Encounter_info;
 import com.hospital.hospitalapp.ehr.entity.Episodes_info;
 import com.hospital.hospitalapp.ehr.entity.Op_Record_info;
+import com.hospital.hospitalapp.ehr.repository.Access_logs_repo;
 import com.hospital.hospitalapp.ehr.repository.Encounter_info_repo;
 import com.hospital.hospitalapp.ehr.repository.Episodes_info_repo;
 import com.hospital.hospitalapp.ehr.repository.Op_Record_info_repo;
@@ -43,8 +45,6 @@ public class HospitalAppService {
     @Autowired
     private Doctor_info_repo doctor_info_repo;
 
-
-
     @Value("${hospital.id}")
     private String hospital_id;
 
@@ -63,6 +63,12 @@ public class HospitalAppService {
     @Value("${consentManager.validate}")
     private  String validateConsentURL;
 
+    @Value("${admin.username}")
+    private String adminUsername;
+
+    @Value("${admin.password}")
+    private String adminPassword;
+
     @Autowired
     private Episodes_info_repo episodes_info_repo;
 
@@ -77,7 +83,13 @@ public class HospitalAppService {
 
     private String consentManagerToken;
 
-    PasswordEncoder passwordEncoder;
+    @Autowired
+    private JwtService jwtService;
+
+    @Autowired
+    private Access_logs_repo access_logs_repo;
+
+    private PasswordEncoder passwordEncoder=new BCryptPasswordEncoder();
 
     private String getToken(){
         if(consentManagerToken==null)
@@ -98,7 +110,9 @@ public class HospitalAppService {
     public boolean requestConsent(String doctor_id, ConsentRequestDTO consentreuestdto){
 
         Consent_request consent_request=new Consent_request();
-        consent_request.setConsent_request_id("REQ_1234");
+        long id=generateID();
+        String consentRequestId="REQ_" + id;
+        consent_request.setConsent_request_id(consentRequestId);
         consent_request.setPatient_id(consentreuestdto.getPatient_id());
         consent_request.setDoctor_id(doctor_id);
         System.out.println(hospital_id);
@@ -199,7 +213,19 @@ public class HospitalAppService {
             episodesDTOList.add(episodesDTO);
         }
         ehrdto.setEpisodesDTOList(episodesDTOList);
+        saveAccessLog(consent_id,patient_id,doctor_id);
         return ehrdto;
+    }
+
+    private void saveAccessLog(String consent_id,String patient_id,String doctor_id){
+        Access_logs access_logs=new Access_logs();
+        access_logs.setPatient_id(patient_id);
+        access_logs.setDoctor_id(doctor_id);
+        access_logs.setCreated_dt(new Date());
+        long id=generateID();
+        String access_log_id="Acc_" + id;
+        access_logs.setAccess_log_id(access_log_id);
+        access_logs_repo.save(access_logs);
     }
 
     public List<EpisodesDTO> fetchEntireEhrOfPatient(String patientId){
@@ -262,17 +288,16 @@ public class HospitalAppService {
         String email = adminLoginDto.getAdmin_email();
         String password = adminLoginDto.getAdmin_password();
         System.out.println(email + " " + password);
-        JwtService jwtService = new JwtService();
-        if (email.equals("h1admin@gmail.com") && password.equals("password")) {
+        if (email.equals(adminUsername) && password.equals(adminPassword)) {
             //String patient_id = patient_info_repo.findId(email);
-            String token = jwtService.createToken("1");
+            String token = jwtService.createToken(adminUsername);
             return token;
         } else {
             /*
             Unmatched is returned if passwords are not matched.This is used as a key to know whether passwords matched or not
             Donot change the returned value
             */
-            return "Unmatched";
+            return null;
         }
     }
 
@@ -282,14 +307,23 @@ public class HospitalAppService {
         String email = doctorRegistrationDto.getDoctor_email();
 
         //We have to check whether the admin is adding or someone else is adding the data
-        System.out.println(email);
-        Doctor_info doctor_info = new Doctor_info();
-        doctor_info.setDoctor_email(doctorRegistrationDto.getDoctor_email());
+        Doctor_info doctor=doctor_info_repo.getDoctorByEmail(email);
+        if(doctor==null){
+            System.out.println(email);
+            Doctor_info doctor_info = new Doctor_info();
+            doctor_info.setDoctor_email(doctorRegistrationDto.getDoctor_email());
 
-        doctor_info.setDoctor_id("DOC_001"); // String id="PAT_"+UUID.randomUUID().toString();
-        doctor_info_repo.save(doctor_info);
+            long id=generateID();
+            String doctorId="DOC_" + id;
+            doctor_info.setDoctor_id(doctorId); // String id="PAT_"+UUID.randomUUID().toString();
+            doctor_info_repo.save(doctor_info);
 
-        return doctor_info.getDoctor_id();
+            return doctor_info.getDoctor_id();
+        }
+        else{
+            return null;
+        }
+
     }
 
 
@@ -306,21 +340,36 @@ public class HospitalAppService {
             String name = doctorRegistrationDto.getDoctor_name();
             String contact = doctorRegistrationDto.getDoctor_contact();
             String speciality = doctorRegistrationDto.getDoctor_speciality();
-
-            this.passwordEncoder = new BCryptPasswordEncoder();
-            String hash_password = this.passwordEncoder.encode(doctorRegistrationDto.getDoctor_password());
+            String hash_password = passwordEncoder.encode(doctorRegistrationDto.getDoctor_password());
              //saving hashed password in database;
 
             doctor_info_repo.updateDoctorDetails(name,contact,speciality,hash_password,id,email);
             return "Success";
         }
         else{
-            return "Failure";
+            return null;
         }
 
 
     }
 
+    public String loginDoctor(AuthRequestDTO authRequestDTO){
+        Doctor_info doctor_info=doctor_info_repo.getDoctorByEmail(authRequestDTO.getUsername());
+        if(doctor_info!=null){
+            boolean isMatch=passwordEncoder.matches(authRequestDTO.getPassword(),doctor_info.getDoctor_password());
+            if(isMatch){
+                String token=jwtService.createToken(doctor_info.getDoctor_id());
+                return token;
+            }
+            return null;
+        }
+        return null;
+    }
+
+    public long generateID(){
+        long id=(long) Math.floor(Math.random()*9_000_000_000L)+1_000_000_000L;
+        return id;
+    }
 
 
 }

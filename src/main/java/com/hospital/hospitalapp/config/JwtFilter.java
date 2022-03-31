@@ -5,6 +5,7 @@ import com.hospital.hospitalapp.central.entity.PatientInfo;
 import com.hospital.hospitalapp.service.HospitalAppService;
 import com.hospital.hospitalapp.service.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -27,11 +28,17 @@ public class JwtFilter extends OncePerRequestFilter {
     @Autowired
     private HospitalAppService hospitalAppService;
 
+    @Value("${admin.username}")
+    private String adminUsername;
+
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        System.out.println("called");
         String auth=request.getHeader("Authorization");
+        System.out.println(auth);
         if(auth!=null && !"".equals(auth) && auth.startsWith("Bearer ")){
             String id=jwtService.extractID(auth);
+            System.out.println(id);
             if(id!=null && SecurityContextHolder.getContext().getAuthentication()==null){
                 if(id.startsWith("PAT_") && request.getRequestURI().contains("/get-ehr-patient")){
                     PatientInfo patient= hospitalAppService.getPatientById(id);
@@ -48,6 +55,12 @@ public class JwtFilter extends OncePerRequestFilter {
                         ut.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         SecurityContextHolder.getContext().setAuthentication(ut);
                     }
+                }
+                else if(id.equals(adminUsername)){
+                    System.out.println(id);
+                    UsernamePasswordAuthenticationToken ut=new UsernamePasswordAuthenticationToken(adminUsername,null,null);
+                    ut.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                    SecurityContextHolder.getContext().setAuthentication(ut);
                 }
 
             }

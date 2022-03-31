@@ -17,6 +17,9 @@ public interface Doctor_info_repo extends JpaRepository<Doctor_info,String> {
     @Query(value = "SELECT * FROM doctor_info WHERE doctor_id=?1",nativeQuery = true)
     Doctor_info getDoctorById(String doctorId);
 
+    @Query(value = "SELECT * FROM doctor_info WHERE doctor_email=?1",nativeQuery = true)
+    Doctor_info getDoctorByEmail(String email);
+
 
 
     @Transactional

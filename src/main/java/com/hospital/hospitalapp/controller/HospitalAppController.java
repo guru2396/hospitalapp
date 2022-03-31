@@ -80,19 +80,43 @@ public class HospitalAppController {
     @PostMapping(value="/admin-login")
     public ResponseEntity<?> adminLogin(@RequestBody AdminLoginDTO adminLoginDto){
         String token= hospitalAppService.loginAdmin(adminLoginDto);
+        if(token==null){
+            ResponseEntity<String> response=new ResponseEntity<>("Unauthorized",HttpStatus.UNAUTHORIZED);
+            return response;
+        }
         return ResponseEntity.ok(token);
     }
 
+    @CrossOrigin(origins = {"*"})
     @PostMapping(value="/add-doctor")
     public ResponseEntity<?> addDoctor(@RequestBody DoctorRegistrationDTO doctorRegistrationDto){
         String id = hospitalAppService.addDoctor(doctorRegistrationDto);
+        System.out.println(id);
+        if(id==null){
+            ResponseEntity<String> response=new ResponseEntity<>("Doctor with this email already exists ",HttpStatus.INTERNAL_SERVER_ERROR);
+            return response;
+        }
         return ResponseEntity.ok(id);
     }
 
     @PostMapping(value="/register-doctor")
     public ResponseEntity<?> registerDoctor(@RequestBody DoctorRegistrationDTO doctorRegistrationDto){
-        String patientId= hospitalAppService.registerDoctor(doctorRegistrationDto);
-        return ResponseEntity.ok(patientId);
+        String msg= hospitalAppService.registerDoctor(doctorRegistrationDto);
+        if(msg==null){
+            ResponseEntity<String> response=new ResponseEntity<>("Doctor does not exist in the system ",HttpStatus.INTERNAL_SERVER_ERROR);
+            return response;
+        }
+        return ResponseEntity.ok(msg);
+    }
+
+    @PostMapping(value = "/login-doctor")
+    public ResponseEntity<?> loginDoctor(@RequestBody AuthRequestDTO authRequestDTO){
+        String token= hospitalAppService.loginDoctor(authRequestDTO);
+        if(token==null){
+            ResponseEntity<String> response=new ResponseEntity<>("Unauthorized",HttpStatus.UNAUTHORIZED);
+            return response;
+        }
+        return ResponseEntity.ok(token);
     }
 
 }
