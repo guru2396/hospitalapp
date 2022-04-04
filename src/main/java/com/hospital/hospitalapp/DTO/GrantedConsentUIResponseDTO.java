@@ -7,6 +7,6 @@ public class GrantedConsentUIResponseDTO {
     private String patient_id;
     private String patientName;
     private String consent_id;
-    private String delegateAcess;
+    private String delegateAccess;
     private String validity;
 }

@@ -25,8 +25,8 @@ public class HospitalAppController {
 
     @PostMapping(value="/request-consent")
     public ResponseEntity<?> requestConsent(@RequestBody ConsentRequestDTO consentreuestdto, @RequestHeader("Authorization") String token){
-       // String doctor_id=jwtService.extractID(token);
-        boolean response= hospitalAppService.requestConsent(token,consentreuestdto);
+        String doctor_id=jwtService.extractID(token);
+        boolean response= hospitalAppService.requestConsent(doctor_id,consentreuestdto);
         if(response)
         {
             return ResponseEntity.ok("Consent Requested successfully");
@@ -39,7 +39,7 @@ public class HospitalAppController {
 
     @GetMapping(value = "/get-granted-consents")
     public ResponseEntity<?> getGrantedConsents(@RequestHeader("Authorization") String token){
-        String doctor_id=token;//jwtService.extractID(token);
+        String doctor_id=jwtService.extractID(token);
         List<GrantedConsentUIResponseDTO> grantedConsents=hospitalAppService.getGrantedConsents(doctor_id);
         ResponseEntity<List<GrantedConsentUIResponseDTO>> resp=new ResponseEntity<>(grantedConsents, HttpStatus.OK);
         return resp;
@@ -47,7 +47,7 @@ public class HospitalAppController {
 
     @GetMapping(value = "/get-ehr/{patient_id}/{consent_id}")
     public ResponseEntity<?> getEHR(@RequestHeader("Authorization")String token,@PathVariable("patient_id") String patient_id,@PathVariable("consent_id") String consent_id){
-        String doctor_id=token;//jwtService.extractID(token);
+        String doctor_id=jwtService.extractID(token);
         EHRDTO response= hospitalAppService.getEHR(consent_id,patient_id,doctor_id);
         return ResponseEntity.ok(response);
     }

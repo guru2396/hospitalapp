@@ -156,7 +156,7 @@ public class HospitalAppService {
             PatientInfo patient=patient_info_repo.getPatientNames(grantedConsent.getPatient_id());
             grantedConsentUIResponseDTO.setPatientName(patient.getPatient_name());
             grantedConsentUIResponseDTO.setConsent_id(grantedConsent.getConsent_id());
-            grantedConsentUIResponseDTO.setDelegateAcess(grantedConsent.getDelegateAcess());
+            grantedConsentUIResponseDTO.setDelegateAccess(grantedConsent.getDelegateAccess());
             grantedConsentUIResponseDTO.setValidity(grantedConsent.getValidity());
             grantedConsents.add(grantedConsentUIResponseDTO);
         }
@@ -222,6 +222,7 @@ public class HospitalAppService {
         access_logs.setPatient_id(patient_id);
         access_logs.setDoctor_id(doctor_id);
         access_logs.setCreated_dt(new Date());
+        access_logs.setConsent_id(consent_id);
         long id=generateID();
         String access_log_id="Acc_" + id;
         access_logs.setAccess_log_id(access_log_id);
