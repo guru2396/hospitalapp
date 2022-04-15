@@ -1,4 +1,4 @@
-package com.hospital.hospitalapp.ehr.entity;
+package com.hospital.hospitalapp.entity;
 
 import lombok.Data;
 

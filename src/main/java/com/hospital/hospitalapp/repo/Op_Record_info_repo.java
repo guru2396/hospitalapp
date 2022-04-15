@@ -1,6 +1,7 @@
-package com.hospital.hospitalapp.ehr.repository;
+package com.hospital.hospitalapp.repo;
 
-import com.hospital.hospitalapp.ehr.entity.Op_Record_info;
+
+import com.hospital.hospitalapp.entity.Op_Record_info;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;

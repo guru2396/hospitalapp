@@ -1,6 +1,7 @@
-package com.hospital.hospitalapp.ehr.repository;
+package com.hospital.hospitalapp.repo;
 
-import com.hospital.hospitalapp.ehr.entity.Episodes_info;
+
+import com.hospital.hospitalapp.entity.Episodes_info;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
@@ -15,4 +16,7 @@ public interface Episodes_info_repo extends JpaRepository<Episodes_info,String> 
 
     @Query(value = "SELECT * FROM episodes_info WHERE ehr_id=?1",nativeQuery = true)
     List<Episodes_info> getEpisodesByEhrId(String ehr_id);
+
+    @Query(value="SELECT * FROM episodes_info WHERE episode_code=?1 and ehr_id=?2",nativeQuery = true)
+    Episodes_info getEpisodeByCode(String code,String ehr_id);
 }

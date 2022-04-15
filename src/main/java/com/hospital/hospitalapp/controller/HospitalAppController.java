@@ -1,7 +1,6 @@
 package com.hospital.hospitalapp.controller;
 
 import com.hospital.hospitalapp.DTO.*;
-import com.hospital.hospitalapp.central.entity.PatientInfo;
 import com.hospital.hospitalapp.service.HospitalAppService;
 import com.hospital.hospitalapp.service.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -26,8 +25,8 @@ public class HospitalAppController {
     @PostMapping(value="/request-consent")
     public ResponseEntity<?> requestConsent(@RequestBody ConsentRequestDTO consentreuestdto, @RequestHeader("Authorization") String token){
         String doctor_id=jwtService.extractID(token);
-        boolean response= hospitalAppService.requestConsent(doctor_id,consentreuestdto);
-        if(response)
+        String response= hospitalAppService.requestConsent(doctor_id,consentreuestdto);
+        if(response!=null)
         {
             return ResponseEntity.ok("Consent Requested successfully");
         }
@@ -60,7 +59,7 @@ public class HospitalAppController {
 
     @PostMapping(value="/patient-authenticate")
     public ResponseEntity<?> authenticatePatientApp(@RequestBody AuthRequestDTO authRequestDTO){
-        PatientInfo patient= hospitalAppService.getPatientById(authRequestDTO.getUsername());
+        PatientDto patient= hospitalAppService.getPatientById(authRequestDTO.getUsername());
         if(patient!=null){
             if(patientAppSecret.equals(authRequestDTO.getPassword())){
                 String token=jwtService.createToken(patient.getPatient_id());
@@ -117,6 +116,47 @@ public class HospitalAppController {
             return response;
         }
         return ResponseEntity.ok(token);
+    }
+
+    @PostMapping(value = "/create-login")
+    public ResponseEntity<?> createLogin(@RequestBody CreateLoginDto createLoginDto){
+        String msg= hospitalAppService.createLogin(createLoginDto);
+        if(msg==null){
+            ResponseEntity<String> response=new ResponseEntity<>("Doctor not found",HttpStatus.NOT_FOUND);
+            return response;
+        }
+        return ResponseEntity.ok(msg);
+    }
+
+    @PostMapping(value = "/add-record-ehr")
+    public ResponseEntity<?> addEhrRecord(@RequestBody AddEhrDto addEhrDto,@RequestHeader("Authorization") String token){
+        String doctor_id=jwtService.extractID(token);
+        String msg= hospitalAppService.addRecordEhr(addEhrDto,doctor_id);
+        return ResponseEntity.ok(msg);
+    }
+
+    @PostMapping(value="/send-otp/{id}")
+    public ResponseEntity<?> sendOtpToPatient(@PathVariable("id") String id){
+        String status= hospitalAppService.sendOtp(id);
+        return ResponseEntity.ok(status);
+    }
+
+    @PostMapping(value="/validate-otp/{patientId}/{otp}")
+    public ResponseEntity<?> validateOtp(@PathVariable("patientId") String patientId,@PathVariable("otp") String otp){
+        System.out.println("validate controller");
+        String status= hospitalAppService.validateOtp(patientId,otp);
+        if(status==null){
+            ResponseEntity<String> response=new ResponseEntity<>("Wrong otp",HttpStatus.UNAUTHORIZED);
+            return response;
+        }
+        return ResponseEntity.ok(status);
+    }
+
+
+    @GetMapping(value="/get-access-logs/{patientId}")
+    public ResponseEntity<?> getAccessLogs(@PathVariable("patientId") String patientId){
+        List<AccessLogDto> accessLogDtoList= hospitalAppService.getAccessLogs(patientId);
+        return ResponseEntity.ok(accessLogDtoList);
     }
 
 }

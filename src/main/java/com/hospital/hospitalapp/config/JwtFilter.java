@@ -1,7 +1,7 @@
 package com.hospital.hospitalapp.config;
 
-import com.hospital.hospitalapp.central.entity.Doctor_info;
-import com.hospital.hospitalapp.central.entity.PatientInfo;
+import com.hospital.hospitalapp.DTO.PatientDto;
+import com.hospital.hospitalapp.entity.Doctor_login_info;
 import com.hospital.hospitalapp.service.HospitalAppService;
 import com.hospital.hospitalapp.service.JwtService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -40,8 +40,8 @@ public class JwtFilter extends OncePerRequestFilter {
             String id=jwtService.extractID(auth);
             System.out.println(id);
             if(id!=null && SecurityContextHolder.getContext().getAuthentication()==null){
-                if(id.startsWith("PAT_") && request.getRequestURI().contains("/get-ehr-patient")){
-                    PatientInfo patient= hospitalAppService.getPatientById(id);
+                if(id.startsWith("PAT_") ){//&& request.getRequestURI().contains("/get-ehr-patient")){
+                    PatientDto patient= hospitalAppService.getPatientById(id);
                     if(patient!=null){
                         UsernamePasswordAuthenticationToken ut=new UsernamePasswordAuthenticationToken(patient,null,null);
                         ut.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
@@ -49,9 +49,9 @@ public class JwtFilter extends OncePerRequestFilter {
                     }
                 }
                 else if(id.startsWith("DOC_") && !request.getRequestURI().contains("/get-ehr-patient")){
-                    Doctor_info doctor_info= hospitalAppService.getDoctorById(id);
-                    if(doctor_info!=null){
-                        UsernamePasswordAuthenticationToken ut=new UsernamePasswordAuthenticationToken(doctor_info,null,null);
+                    Doctor_login_info doctor_login_info = hospitalAppService.getDoctorById(id);
+                    if(doctor_login_info!=null){
+                        UsernamePasswordAuthenticationToken ut=new UsernamePasswordAuthenticationToken(doctor_login_info,null,null);
                         ut.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                         SecurityContextHolder.getContext().setAuthentication(ut);
                     }

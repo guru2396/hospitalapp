@@ -1,4 +1,4 @@
-package com.hospital.hospitalapp.ehr.entity;
+package com.hospital.hospitalapp.entity;
 
 import lombok.Data;
 
@@ -8,18 +8,18 @@ import javax.persistence.Table;
 import java.util.Date;
 
 @Entity
-@Table(name="op_record_info")
+@Table(name="encounter_info")
 @Data
-public class Op_Record_info {
+public class Encounter_info {
 
     @Id
-    private String op_record_id;
-
     private String encounter_id;
 
-    private String diagnosis;
+    private String episode_id;
 
-    private String record_details;
+    private String doctor_id;
+
+    private String patient_id;
 
     private Date created_dt;
 }

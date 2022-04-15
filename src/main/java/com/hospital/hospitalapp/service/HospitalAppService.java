@@ -1,21 +1,10 @@
 package com.hospital.hospitalapp.service;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.hospital.hospitalapp.DTO.*;
-import com.hospital.hospitalapp.central.entity.Consent_request;
-import com.hospital.hospitalapp.central.entity.Doctor_info;
-import com.hospital.hospitalapp.central.entity.PatientInfo;
-import com.hospital.hospitalapp.central.repository.Consent_request_repo;
-import com.hospital.hospitalapp.central.repository.Doctor_info_repo;
-import com.hospital.hospitalapp.central.repository.Ehr_info_repo;
-import com.hospital.hospitalapp.central.repository.Patient_Info_Repo;
-import com.hospital.hospitalapp.ehr.entity.Access_logs;
-import com.hospital.hospitalapp.ehr.entity.Encounter_info;
-import com.hospital.hospitalapp.ehr.entity.Episodes_info;
-import com.hospital.hospitalapp.ehr.entity.Op_Record_info;
-import com.hospital.hospitalapp.ehr.repository.Access_logs_repo;
-import com.hospital.hospitalapp.ehr.repository.Encounter_info_repo;
-import com.hospital.hospitalapp.ehr.repository.Episodes_info_repo;
-import com.hospital.hospitalapp.ehr.repository.Op_Record_info_repo;
+import com.hospital.hospitalapp.entity.*;
+import com.hospital.hospitalapp.repo.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -28,22 +17,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 public class HospitalAppService {
-    @Autowired
-    private Consent_request_repo consent_request_repo;
-
-    @Autowired
-    private Patient_Info_Repo patient_info_repo;
-
-    @Autowired
-    private Doctor_info_repo doctor_info_repo;
 
     @Value("${hospital.id}")
     private String hospital_id;
@@ -78,8 +57,6 @@ public class HospitalAppService {
     @Autowired
     private Encounter_info_repo encounter_info_repo;
 
-    @Autowired
-    private Ehr_info_repo ehr_info_repo;
 
     private String consentManagerToken;
 
@@ -88,6 +65,29 @@ public class HospitalAppService {
 
     @Autowired
     private Access_logs_repo access_logs_repo;
+
+    @Value("${centraldbserver.url}")
+    private String centralDbServerUrl;
+
+    @Value("${centraldbserver.clientId}")
+    private String centralDbServerClientId;
+
+    @Value("${centraldbserver.clientSecret}")
+    private String centralDbServerClientSecret;
+
+    private String centralServerToken;
+
+    @Autowired
+    private Doctor_login_info_repo doctor_login_info_repo;
+
+    @Autowired
+    private OtpService otpService;
+
+    @Autowired
+    private EmailService emailService;
+
+    @Value("${hospital.name}")
+    private String hospitalName;
 
     private PasswordEncoder passwordEncoder=new BCryptPasswordEncoder();
 
@@ -107,9 +107,35 @@ public class HospitalAppService {
         return consentManagerToken;
     }
 
-    public boolean requestConsent(String doctor_id, ConsentRequestDTO consentreuestdto){
+    private String getCentralServerToken(){
+        if(centralServerToken==null){
+            RestTemplate restTemplate=new RestTemplate();
+            AuthRequestDTO authRequestDTO=new AuthRequestDTO();
+            authRequestDTO.setUsername(centralDbServerClientId);
+            authRequestDTO.setPassword(centralDbServerClientSecret);
+            String url=centralDbServerUrl + "/hospitalapp-authenticate";
+            HttpHeaders httpHeaders=new HttpHeaders();
+            HttpEntity<?> httpEntity=new HttpEntity<>(authRequestDTO,httpHeaders);
+            ResponseEntity<String> tokenResponse=restTemplate.exchange(url, HttpMethod.POST,httpEntity,String.class);
+            centralServerToken=tokenResponse.getBody();
+        }
+        return centralServerToken;
+    }
 
-        Consent_request consent_request=new Consent_request();
+    public String requestConsent(String doctor_id, ConsentRequestDTO consentreuestdto){
+
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders httpHeaders = new HttpHeaders();
+        String token=getCentralServerToken();
+        token="Bearer " + token;
+        List<String> l=new ArrayList<>();
+        l.add(token);
+        httpHeaders.put("Authorization",l);
+        HttpEntity<?> httpEntity = new HttpEntity<>(consentreuestdto,httpHeaders);
+        String url=centralDbServerUrl + "/create-consent-request/" + doctor_id +"/"+ hospital_id;
+        ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.POST,httpEntity,String.class);
+        return response.getBody();
+        /*Consent_request consent_request=new Consent_request();
         long id=generateID();
         String consentRequestId="REQ_" + id;
         consent_request.setConsent_request_id(consentRequestId);
@@ -129,7 +155,7 @@ public class HospitalAppService {
             System.out.println(e);
             return false;
         }
-        return true;
+        return true;*/
     }
 
 
@@ -153,14 +179,28 @@ public class HospitalAppService {
                 grantedConsentResponseDTOS) {
             GrantedConsentUIResponseDTO grantedConsentUIResponseDTO=new GrantedConsentUIResponseDTO();
             grantedConsentUIResponseDTO.setPatient_id(grantedConsent.getPatient_id());
-            PatientInfo patient=patient_info_repo.getPatientNames(grantedConsent.getPatient_id());
-            grantedConsentUIResponseDTO.setPatientName(patient.getPatient_name());
+            String name=getPatientById(grantedConsent.getPatient_id()).getPatient_name();
+            grantedConsentUIResponseDTO.setPatientName(name);
             grantedConsentUIResponseDTO.setConsent_id(grantedConsent.getConsent_id());
             grantedConsentUIResponseDTO.setDelegateAccess(grantedConsent.getDelegateAccess());
             grantedConsentUIResponseDTO.setValidity(grantedConsent.getValidity());
             grantedConsents.add(grantedConsentUIResponseDTO);
         }
         return grantedConsents;
+    }
+
+    public PatientDto getPatientById(String patientId){
+        RestTemplate restTemplate=new RestTemplate();
+        HttpHeaders headers=new HttpHeaders();
+        String token=getCentralServerToken();
+        token="Bearer " + token;
+        List<String> l=new ArrayList<>();
+        l.add(token);
+        headers.put("Authorization",l);
+        HttpEntity<?> httpEntity=new HttpEntity<>(headers);
+        String url=centralDbServerUrl + "/get-patient/" + patientId;
+        ResponseEntity<PatientDto> response=restTemplate.exchange(url,HttpMethod.GET,httpEntity,PatientDto.class);
+        return response.getBody();
     }
 
     public EHRDTO getEHR(String consent_id,String patient_id,String doctor_id) {
@@ -205,7 +245,7 @@ public class HospitalAppService {
                 }
                 encountersDTO.setOp_records(ops_recordsDTOList);
                 String doctorId=encounter_info_repo.getEncounterById(encounterDetails.getEncounterId()).getDoctor_id();
-                String doctorName=doctor_info_repo.getDoctorById(doctorId).getDoctor_name();
+                String doctorName=getDoctorById(doctorId).getDoctor_name();
                 encountersDTO.setDoctorName(doctorName);
                 encountersDTOList.add(encountersDTO);
             }
@@ -229,9 +269,23 @@ public class HospitalAppService {
         access_logs_repo.save(access_logs);
     }
 
+    private String fetchEhrIdByPatientId(String id){
+        RestTemplate restTemplate=new RestTemplate();
+        HttpHeaders headers=new HttpHeaders();
+        String token=getCentralServerToken();
+        token="Bearer " + token;
+        List<String> l=new ArrayList<>();
+        l.add(token);
+        headers.put("Authorization",l);
+        HttpEntity<?> httpEntity=new HttpEntity<>(headers);
+        String url=centralDbServerUrl + "/get-ehrId/" + id;
+        ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.GET,httpEntity,String.class);
+        return response.getBody();
+    }
+
     public List<EpisodesDTO> fetchEntireEhrOfPatient(String patientId){
         List<EpisodesDTO> episodes=new ArrayList<>();
-        String ehr_id=ehr_info_repo.getEhrIdByPatientId(patientId);
+        String ehr_id=fetchEhrIdByPatientId(patientId);
         List<Episodes_info> episodes_infos= episodes_info_repo.getEpisodesByEhrId(ehr_id);
         if(episodes_infos!=null){
             for(Episodes_info episodes_info:episodes_infos){
@@ -246,7 +300,7 @@ public class HospitalAppService {
                         System.out.println("Encounters");
                         EncountersDTO encountersDTO=new EncountersDTO();
                         encountersDTO.setEncounterId(encounter_info.getEncounter_id());
-                        String doctorName=doctor_info_repo.getDoctorById(encounter_info.getDoctor_id()).getDoctor_name();
+                        String doctorName=getDoctorById(encounter_info.getDoctor_id()).getDoctor_name();
                         encountersDTO.setDoctorName(doctorName);
                         List<Ops_recordsDTO> op_records=new ArrayList<>();
                         List<Op_Record_info> op_record_infos=op_record_info_repo.getOpRecords(encounter_info.getEncounter_id());
@@ -274,12 +328,9 @@ public class HospitalAppService {
         return episodes;
     }
 
-    public PatientInfo getPatientById(String patientId){
-        return patient_info_repo.getPatientNames(patientId);
-    }
 
-    public Doctor_info getDoctorById(String doctorId){
-        return doctor_info_repo.getDoctorById(doctorId);
+    public Doctor_login_info getDoctorById(String doctorId){
+        return doctor_login_info_repo.getLoginInfoById(doctorId);
     }
 
 
@@ -307,8 +358,19 @@ public class HospitalAppService {
 
         String email = doctorRegistrationDto.getDoctor_email();
 
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers=new HttpHeaders();
+        String token=getCentralServerToken();
+        token="Bearer " + token;
+        List<String> l=new ArrayList<>();
+        l.add(token);
+        headers.put("Authorization",l);
+        HttpEntity<?> httpEntity = new HttpEntity<>(headers);
+        String url=centralDbServerUrl + "/add-doctor/" + email;
+        ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.POST,httpEntity,String.class);
+        return response.getBody();
         //We have to check whether the admin is adding or someone else is adding the data
-        Doctor_info doctor=doctor_info_repo.getDoctorByEmail(email);
+        /*Doctor_info doctor=doctor_info_repo.getDoctorByEmail(email);
         if(doctor==null){
             System.out.println(email);
             Doctor_info doctor_info = new Doctor_info();
@@ -323,19 +385,31 @@ public class HospitalAppService {
         }
         else{
             return null;
-        }
+        }*/
 
     }
 
 
 
     public String registerDoctor(DoctorRegistrationDTO doctorRegistrationDto){
-        Doctor_info doctor_info=new Doctor_info();
+
         String id = doctorRegistrationDto.getDoctor_id();
         String email = doctorRegistrationDto.getDoctor_email();
 
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers=new HttpHeaders();
+        String token=getCentralServerToken();
+        token="Bearer " + token;
+        List<String> l=new ArrayList<>();
+        l.add(token);
+        headers.put("Authorization",l);
+        HttpEntity<?> httpEntity = new HttpEntity<>(doctorRegistrationDto,headers);
+        String url=centralDbServerUrl + "/register-doctor";
+        ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.POST,httpEntity,String.class);
+
+        return response.getBody();
         //check if the doctor with the entered id and email exist or not
-        String ret_email = doctor_info_repo.findDoctor(id,email);
+        /*String ret_email = doctor_info_repo.findDoctor(id,email);
         if(email.equals(ret_email)){
             //doctor with the id exist hence we can now procede updating the values
             String name = doctorRegistrationDto.getDoctor_name();
@@ -349,17 +423,17 @@ public class HospitalAppService {
         }
         else{
             return null;
-        }
+        }*/
 
 
     }
 
     public String loginDoctor(AuthRequestDTO authRequestDTO){
-        Doctor_info doctor_info=doctor_info_repo.getDoctorByEmail(authRequestDTO.getUsername());
-        if(doctor_info!=null){
-            boolean isMatch=passwordEncoder.matches(authRequestDTO.getPassword(),doctor_info.getDoctor_password());
+        Doctor_login_info doctor_login_info= doctor_login_info_repo.getLoginInfoByEmail(authRequestDTO.getUsername());
+        if(doctor_login_info!=null){
+            boolean isMatch=passwordEncoder.matches(authRequestDTO.getPassword(),doctor_login_info.getDoctor_password());
             if(isMatch){
-                String token=jwtService.createToken(doctor_info.getDoctor_id());
+                String token=jwtService.createToken(doctor_login_info.getDoctor_id());
                 return token;
             }
             return null;
@@ -370,6 +444,155 @@ public class HospitalAppService {
     public long generateID(){
         long id=(long) Math.floor(Math.random()*9_000_000_000L)+1_000_000_000L;
         return id;
+    }
+
+    public String createLogin(CreateLoginDto createLoginDto){
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers=new HttpHeaders();
+        String token=getCentralServerToken();
+        token="Bearer " + token;
+        List<String> l=new ArrayList<>();
+        l.add(token);
+        headers.put("Authorization",l);
+        HttpEntity<?> httpEntity = new HttpEntity<>(headers);
+        String url=centralDbServerUrl + "/get-doctor/" + createLoginDto.getDoctor_id();
+        ResponseEntity<DoctorDto> response=restTemplate.exchange(url,HttpMethod.GET,httpEntity,DoctorDto.class);
+        if(response.getBody()!=null){
+            Doctor_login_info doctor_login_info=new Doctor_login_info();
+            doctor_login_info.setDoctor_id(createLoginDto.getDoctor_id());
+            doctor_login_info.setDoctor_email(createLoginDto.getUsername());
+            String hash_password=passwordEncoder.encode(createLoginDto.getPassword());
+            doctor_login_info.setDoctor_password(hash_password);
+            doctor_login_info.setDoctor_name(response.getBody().getDoctor_name());
+            doctor_login_info.setIs_verified("N");
+            doctor_login_info_repo.save(doctor_login_info);
+            sendOtp(createLoginDto.getDoctor_id());
+            return "success";
+        }
+        return null;
+    }
+
+    public String addRecordEhr(AddEhrDto addEhrDto,String doctor_id){
+        String ehrId=fetchEhrIdByPatientId(addEhrDto.getPatient_id());
+        Episodes_info episode=episodes_info_repo.getEpisodeByCode(addEhrDto.getEpisode(),ehrId);
+        if(episode==null){
+            episode=new Episodes_info();
+            episode.setEpisode_code(addEhrDto.getEpisode());
+            episode.setCreated_dt(new Date());
+            episode.setEhr_id(ehrId);
+            episode.setEpisode_name(addEhrDto.getEpisode_name());
+            long id=generateID();
+            String episodeId="EPI_" + id;
+            episode.setEpisode_id(episodeId);
+            episodes_info_repo.save(episode);
+        }
+        String epiId=episode.getEpisode_id();
+        Encounter_info encounter_info=new Encounter_info();
+        encounter_info.setDoctor_id(doctor_id);
+        encounter_info.setPatient_id(addEhrDto.getPatient_id());
+        encounter_info.setEpisode_id(epiId);
+        encounter_info.setCreated_dt(new Date());
+        long id=generateID();
+        String encId="ENC_" + id;
+        encounter_info.setEncounter_id(encId);
+        encounter_info_repo.save(encounter_info);
+        Op_Record_info op_record_info=new Op_Record_info();
+        op_record_info.setEncounter_id(encId);
+        op_record_info.setDiagnosis(addEhrDto.getDiagnosis());
+        op_record_info.setCreated_dt(new Date());
+        id=generateID();
+        String opId="OP_" + id;
+        op_record_info.setOp_record_id(opId);
+        Map<String,String> records=new HashMap<>();
+        records.put("Complaints",addEhrDto.getComplaints());
+        records.put("Prescription",addEhrDto.getPrescription());
+        records.put("Treatment",addEhrDto.getTreatment());
+        records.put("FollowUpPlan",addEhrDto.getFollowUpPlan());
+        ObjectMapper objectMapper=new ObjectMapper();
+        String jsonRecord=null;
+        try {
+            jsonRecord= objectMapper.writeValueAsString(records);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+        }
+        op_record_info.setRecord_details(jsonRecord);
+        op_record_info_repo.save(op_record_info);
+        return "Success";
+    }
+
+    public String sendOtp(String id){
+        if(id.startsWith("PAT_")){
+            PatientDto patientDto=getPatientById(id);
+            if(patientDto!=null){
+                Integer otp= otpService.generateOTP(id);
+                emailService.sendEmail(patientDto.getPatient_email(),String.valueOf(otp));
+                return "Success";
+            }
+        }
+        else if(id.startsWith("DOC_")){
+            Doctor_login_info doctor_login_info=getDoctorById(id);
+            if(doctor_login_info!=null){
+                Integer otp= otpService.generateOTP(id);
+                emailService.sendEmail(doctor_login_info.getDoctor_email(),String.valueOf(otp));
+                return "Success";
+            }
+        }
+
+        return null;
+    }
+
+    public String validateOtp(String id,String otp){
+        System.out.println("validate service");
+        int storedOtp= otpService.getOtp(id);
+        System.out.println(storedOtp);
+        if(storedOtp!=0){
+            int intOtp=Integer.parseInt(otp);
+            if(storedOtp==intOtp){
+                System.out.println("otp valid");
+                if(id.startsWith("DOC_")){
+                    Doctor_login_info doctor_login_info=getDoctorById(id);
+                    doctor_login_info.setIs_verified("Y");
+                    doctor_login_info_repo.save(doctor_login_info);
+                }
+                return "Success";
+            }
+            return null;
+        }
+        return null;
+    }
+
+    public List<AccessLogDto> getAccessLogs(String patientId){
+        List<Access_logs> access_logs= access_logs_repo.getAccessLogsForPatient(patientId);
+        List<AccessLogDto> accessLogDtoList=new ArrayList<>();
+        for(Access_logs accessLog:access_logs){
+            AccessLogDto accessLogDto=new AccessLogDto();
+            accessLogDto.setLog_id(accessLog.getAccess_log_id());
+            accessLogDto.setConsent_id(accessLog.getConsent_id());
+            Doctor_login_info doctor_login_info=doctor_login_info_repo.getLoginInfoById(accessLog.getDoctor_id());
+            if(doctor_login_info!=null){
+                accessLogDto.setDoctor_name(doctor_login_info.getDoctor_name());
+            }
+            else{
+                RestTemplate restTemplate = new RestTemplate();
+                HttpHeaders headers=new HttpHeaders();
+                String token=getCentralServerToken();
+                token="Bearer " + token;
+                List<String> l=new ArrayList<>();
+                l.add(token);
+                headers.put("Authorization",l);
+                HttpEntity<?> httpEntity = new HttpEntity<>(headers);
+                String url=centralDbServerUrl + "/get-doctor/" + accessLog.getDoctor_id();
+                ResponseEntity<DoctorDto> response=restTemplate.exchange(url,HttpMethod.GET,httpEntity,DoctorDto.class);
+                accessLogDto.setDoctor_name(response.getBody().getDoctor_name());
+            }
+            DateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+            String date=null;
+            date=dateFormat.format(accessLog.getCreated_dt());
+            accessLogDto.setTimestamp(date);
+            accessLogDto.setHospital_name(hospitalName);
+            accessLogDtoList.add(accessLogDto);
+        }
+        return accessLogDtoList;
     }
 
 
