@@ -75,6 +75,9 @@ public class HospitalAppService {
     @Value("${centraldbserver.clientSecret}")
     private String centralDbServerClientSecret;
 
+    @Value("consentManager.delegateConsent")
+    private String delegateConsentURL;
+
     private String centralServerToken;
 
     @Autowired
@@ -446,7 +449,7 @@ public class HospitalAppService {
         return id;
     }
 
-    public String createLogin(CreateLoginDto createLoginDto){
+    private DoctorDto fetchDoctorInfoFromCentral(String doctorId){
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers=new HttpHeaders();
         String token=getCentralServerToken();
@@ -455,15 +458,20 @@ public class HospitalAppService {
         l.add(token);
         headers.put("Authorization",l);
         HttpEntity<?> httpEntity = new HttpEntity<>(headers);
-        String url=centralDbServerUrl + "/get-doctor/" + createLoginDto.getDoctor_id();
+        String url=centralDbServerUrl + "/get-doctor/" + doctorId;
         ResponseEntity<DoctorDto> response=restTemplate.exchange(url,HttpMethod.GET,httpEntity,DoctorDto.class);
-        if(response.getBody()!=null){
+        return response.getBody();
+    }
+
+    public String createLogin(CreateLoginDto createLoginDto){
+        DoctorDto doctorDto=fetchDoctorInfoFromCentral(createLoginDto.getDoctor_id());
+        if(doctorDto!=null){
             Doctor_login_info doctor_login_info=new Doctor_login_info();
             doctor_login_info.setDoctor_id(createLoginDto.getDoctor_id());
             doctor_login_info.setDoctor_email(createLoginDto.getUsername());
             String hash_password=passwordEncoder.encode(createLoginDto.getPassword());
             doctor_login_info.setDoctor_password(hash_password);
-            doctor_login_info.setDoctor_name(response.getBody().getDoctor_name());
+            doctor_login_info.setDoctor_name(doctorDto.getDoctor_name());
             doctor_login_info.setIs_verified("N");
             doctor_login_info_repo.save(doctor_login_info);
             sendOtp(createLoginDto.getDoctor_id());
@@ -595,5 +603,24 @@ public class HospitalAppService {
         return accessLogDtoList;
     }
 
+    public String delegateconsentservice(String doctorId,String consentId,String loggedInDoctor){
+        RestTemplate restTemplate=new RestTemplate();
+        String delegateURL=delegateConsentURL+ doctorId+consentId;
+        String consentToken=getToken();
+        HttpHeaders httpHeaders=new HttpHeaders();
+        HttpEntity<?> httpEntity=new HttpEntity<>(httpHeaders);
+        String finalToken="Bearer " + consentToken;
+        List<String> tokens=new ArrayList<>();
+        tokens.add(finalToken);
+        httpHeaders.put("Authorization",tokens);
+        ResponseEntity<String> patientId=restTemplate.exchange(delegateURL, HttpMethod.GET, httpEntity, String.class);
+        PatientDto patient=getPatientById(patientId.getBody());
+        String email=patient.getPatient_email();
+        DoctorDto delegatedDoctorDto=fetchDoctorInfoFromCentral(doctorId);
+        DoctorDto doctorDto=fetchDoctorInfoFromCentral(loggedInDoctor);
 
+        emailService.sendDelegateEmail(email,consentId,doctorDto.getDoctor_name(),delegatedDoctorDto.getDoctor_name());
+        //String doctor=
+        return "Delegation of consent successful";
+    }
 }

@@ -19,7 +19,22 @@ public class EmailService {
     @Value("${hospital.password}")
     private String myPassword;
 
-
+    public void sendDelegateEmail(String patientEmail,String consentId,String doctor,String delegatedDoctor){
+        javaMailSender.setPort(587);
+        javaMailSender.setHost("smtp.gmail.com");
+        javaMailSender.setUsername(myEmail);
+        javaMailSender.setPassword(myPassword);
+        Properties properties=javaMailSender.getJavaMailProperties();
+        properties.put("mail.smtp.starttls.enable", "true");
+        properties.put("mail.smtp.auth", "true");
+        SimpleMailMessage mailMessage=new SimpleMailMessage();
+        mailMessage.setTo(patientEmail);
+        mailMessage.setSubject("Consent Delegation Notification");
+        String text="\nDoctor "+doctor+" delegated consent "+consentId+" to doctor "+delegatedDoctor;
+        mailMessage.setText(text);
+        mailMessage.setFrom(myEmail);
+        javaMailSender.send(mailMessage);
+    }
     public void sendEmail(String emailId,String otp){
         javaMailSender.setPort(587);
         javaMailSender.setHost("smtp.gmail.com");

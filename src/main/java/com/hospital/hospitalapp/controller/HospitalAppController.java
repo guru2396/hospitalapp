@@ -159,4 +159,16 @@ public class HospitalAppController {
         return ResponseEntity.ok(accessLogDtoList);
     }
 
+    @PostMapping(value="/delegate-consent/{doctorId}/{consentId}")
+    public ResponseEntity<?> delegateConsent(@PathVariable("doctorId") String doctorId,@PathVariable("consentId") String consentId,@RequestHeader("Authorization") String token){
+        //System.out.println("validate controller");
+        String loggedInDoctor= jwtService.extractID(token);
+        String status= hospitalAppService.delegateconsentservice(doctorId,consentId,loggedInDoctor);
+        if(status==null){
+            ResponseEntity<String> response=new ResponseEntity<>("error in delegation of consent",HttpStatus.UNAUTHORIZED);
+            return response;
+        }
+        return ResponseEntity.ok(status);
+    }
+
 }
