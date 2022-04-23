@@ -175,7 +175,7 @@ public class HospitalAppController {
         return ResponseEntity.ok(status);
     }
 
-    @GetMapping(value = "/get-ehr-records")
+    @PostMapping(value = "/get-ehr-records")
     public ResponseEntity<?> getEhrRecords(@RequestBody RequestEhrDto requestEhrDto){
         EHRDTO ehrdto= hospitalAppService.getEhrRecords(requestEhrDto);
         return ResponseEntity.ok(ehrdto);

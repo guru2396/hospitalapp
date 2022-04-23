@@ -252,9 +252,9 @@ public class HospitalAppService {
                 l.add(token);
                 headers.put("Authorization",l);
                 HttpEntity<?> entity = new HttpEntity<>(requestEhrDto,headers);
-                String url= environment.getProperty(hospital_id+".url");
+                String url= environment.getProperty(dataCustodian.getDataCustodianId()+".url");
                 url=url + "/get-ehr-records";
-                ResponseEntity<EHRDTO> response=restTemplate.exchange(url,HttpMethod.GET,entity,EHRDTO.class);
+                ResponseEntity<EHRDTO> response=restTemplate.exchange(url,HttpMethod.POST,entity,EHRDTO.class);
                 EHRDTO ehrResponse=response.getBody();
                 episodesDTOList.addAll(ehrResponse.getEpisodesDTOList());
             }
