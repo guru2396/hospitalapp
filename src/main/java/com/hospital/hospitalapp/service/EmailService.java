@@ -35,7 +35,7 @@ public class EmailService {
         mailMessage.setFrom(myEmail);
         javaMailSender.send(mailMessage);
     }
-    public void sendEmail(String emailId,String otp){
+    public void sendEmail(String emailId,String otp,boolean isDoctor){
         javaMailSender.setPort(587);
         javaMailSender.setHost("smtp.gmail.com");
         javaMailSender.setUsername(myEmail);
@@ -45,8 +45,16 @@ public class EmailService {
         properties.put("mail.smtp.auth", "true");
         SimpleMailMessage mailMessage=new SimpleMailMessage();
         mailMessage.setTo(emailId);
-        mailMessage.setSubject("OTP for consent verification");
-        String text="\nOTP: "+otp+"\nPlease provide this otp to the doctor if you want to give consent to add record";
+        String text="";
+        if(isDoctor){
+            mailMessage.setSubject("OTP for verification");
+            text="\nOTP: "+otp+"\nPlease provide this otp verification";
+        }
+        else{
+            mailMessage.setSubject("OTP for consent verification");
+            text="\nOTP: "+otp+"\nPlease provide this otp to the doctor for adding record to ehr";
+        }
+
         mailMessage.setText(text);
         mailMessage.setFrom(myEmail);
         javaMailSender.send(mailMessage);

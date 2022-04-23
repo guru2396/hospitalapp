@@ -22,6 +22,10 @@ public class HospitalAppController {
     @Value("${patientapp.secret}")
     private String patientAppSecret;
 
+    @Value("${hospital.clientSecret}")
+    private String hospitalAppSecret;
+
+
     @PostMapping(value="/request-consent")
     public ResponseEntity<?> requestConsent(@RequestBody ConsentRequestDTO consentreuestdto, @RequestHeader("Authorization") String token){
         String doctor_id=jwtService.extractID(token);
@@ -169,6 +173,23 @@ public class HospitalAppController {
             return response;
         }
         return ResponseEntity.ok(status);
+    }
+
+    @GetMapping(value = "/get-ehr-records")
+    public ResponseEntity<?> getEhrRecords(@RequestBody RequestEhrDto requestEhrDto){
+        EHRDTO ehrdto= hospitalAppService.getEhrRecords(requestEhrDto);
+        return ResponseEntity.ok(ehrdto);
+    }
+
+    @PostMapping(value = "/hospital-authenticate")
+    public ResponseEntity<?> authenticateHospital(@RequestBody AuthRequestDTO authRequestDTO){
+        HospitalDto hospitalDto= hospitalAppService.getHospitalById(authRequestDTO.getUsername());
+        if(hospitalDto!=null && hospitalAppSecret.equals(authRequestDTO.getPassword())){
+            String token= jwtService.createToken(authRequestDTO.getUsername());
+            return ResponseEntity.ok(token);
+        }
+        ResponseEntity<String> response=new ResponseEntity<>("Unauthorized",HttpStatus.UNAUTHORIZED);
+        return response;
     }
 
 }

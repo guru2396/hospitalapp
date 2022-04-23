@@ -17,4 +17,7 @@ public interface Encounter_info_repo extends JpaRepository<Encounter_info,String
     @Query(value = "SELECT * FROM encounter_info WHERE episode_id=?1",nativeQuery = true)
     List<Encounter_info> getEncountersByEpisodeId(String episodeId);
 
+    @Query(value = "SELECT * FROM encounter_info WHERE patient_id=?1",nativeQuery = true)
+    List<Encounter_info> getEncountersByPatientId(String patientId);
+
 }

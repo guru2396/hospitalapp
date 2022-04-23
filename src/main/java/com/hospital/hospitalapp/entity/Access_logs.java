@@ -23,6 +23,8 @@ public class Access_logs {
 
     private String ehr_id;
 
+    private String access_purpose;
+
     private String records_accessed;
 
     private Date created_dt;

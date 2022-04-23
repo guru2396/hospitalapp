@@ -8,6 +8,7 @@ import com.hospital.hospitalapp.repo.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.core.env.Environment;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -75,7 +76,7 @@ public class HospitalAppService {
     @Value("${centraldbserver.clientSecret}")
     private String centralDbServerClientSecret;
 
-    @Value("consentManager.delegateConsent")
+    @Value("${consentManager.delegateConsent}")
     private String delegateConsentURL;
 
     private String centralServerToken;
@@ -89,10 +90,18 @@ public class HospitalAppService {
     @Autowired
     private EmailService emailService;
 
+    @Autowired
+    private Environment environment;
+
     @Value("${hospital.name}")
     private String hospitalName;
 
+    @Value("${hospital.clientSecret}")
+    private String hospitalSecret;
+
     private PasswordEncoder passwordEncoder=new BCryptPasswordEncoder();
+
+    private Map<String,String> tokenMap=new HashMap<>();
 
     private String getToken(){
         if(consentManagerToken==null)
@@ -223,7 +232,67 @@ public class HospitalAppService {
         EHRDTO ehrdto=new EHRDTO();
         ValidateConsentDTO validateConsentDTO=validateConsent.getBody();
         List<EpisodesDTO> episodesDTOList=new ArrayList<>();
-        for(EpisodesDetails episodesDetails:validateConsentDTO.getEpisodes()){
+        for(DataCustodian dataCustodian:validateConsentDTO.getDataCustodians()){
+            if(dataCustodian.getDataCustodianId().equals(hospital_id)){
+                List<EpisodesDTO> episodesDTOs=fetchEhrFromDb(dataCustodian.getEpisodes());
+                episodesDTOList.addAll(episodesDTOs);
+                saveAccessLog(consent_id,patient_id,doctor_id,validateConsentDTO.getAccessPurpose());
+            }
+            else{
+                RequestEhrDto requestEhrDto=new RequestEhrDto();
+                requestEhrDto.setConsent_id(consent_id);
+                requestEhrDto.setDoctor_id(doctor_id);
+                requestEhrDto.setPatient_id(patient_id);
+                requestEhrDto.setPurpose(validateConsentDTO.getAccessPurpose());
+                requestEhrDto.setEpisodes(dataCustodian.getEpisodes());
+                String token=fetchHospitalToken(dataCustodian.getDataCustodianId());
+                token="Bearer " + token;
+                HttpHeaders headers = new HttpHeaders();
+                List<String> l=new ArrayList<>();
+                l.add(token);
+                headers.put("Authorization",l);
+                HttpEntity<?> entity = new HttpEntity<>(requestEhrDto,headers);
+                String url= environment.getProperty(hospital_id+".url");
+                url=url + "/get-ehr-records";
+                ResponseEntity<EHRDTO> response=restTemplate.exchange(url,HttpMethod.GET,entity,EHRDTO.class);
+                EHRDTO ehrResponse=response.getBody();
+                episodesDTOList.addAll(ehrResponse.getEpisodesDTOList());
+            }
+        }
+        ehrdto.setEpisodesDTOList(episodesDTOList);
+        ehrdto.setEhr_id(fetchEhrIdByPatientId(patient_id));
+        return ehrdto;
+    }
+
+    private String fetchHospitalToken(String hospitalId){
+        if(!tokenMap.containsKey(hospital_id)){
+            String url= environment.getProperty(hospitalId+".url");
+            AuthRequestDTO authRequestDTO=new AuthRequestDTO();
+            authRequestDTO.setUsername(hospital_id);
+            authRequestDTO.setPassword(hospitalSecret);
+            RestTemplate restTemplate = new RestTemplate();
+            HttpHeaders httpHeaders = new HttpHeaders();
+            HttpEntity<?> httpEntity = new HttpEntity<>(authRequestDTO,httpHeaders);
+            url=url + "/hospital-authenticate";
+            ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.POST,httpEntity,String.class);
+            String token=response.getBody();
+            tokenMap.put(hospital_id,token);
+        }
+        return tokenMap.get(hospital_id);
+
+    }
+
+    public EHRDTO getEhrRecords(RequestEhrDto requestEhrDto){
+        EHRDTO ehrdto=new EHRDTO();
+        List<EpisodesDTO> episodesDTOList=fetchEhrFromDb(requestEhrDto.getEpisodes());
+        ehrdto.setEpisodesDTOList(episodesDTOList);
+        saveAccessLog(requestEhrDto.getConsent_id(),requestEhrDto.getPatient_id(),requestEhrDto.getDoctor_id(),requestEhrDto.getPurpose());
+        return ehrdto;
+    }
+
+    private List<EpisodesDTO> fetchEhrFromDb(List<EpisodesDetails> episodesDetailsList){
+        List<EpisodesDTO> episodesDTOList=new ArrayList<>();
+        for(EpisodesDetails episodesDetails:episodesDetailsList){
             EpisodesDTO episodesDTO=new EpisodesDTO();
             episodesDTO.setEpisodeId(episodesDetails.getEpisodeId());
             episodesDTO.setEpisodeName(episodes_info_repo.getEpisodeNameById(episodesDetails.getEpisodeId()));
@@ -255,15 +324,14 @@ public class HospitalAppService {
             episodesDTO.setEncounters(encountersDTOList);
             episodesDTOList.add(episodesDTO);
         }
-        ehrdto.setEpisodesDTOList(episodesDTOList);
-        saveAccessLog(consent_id,patient_id,doctor_id);
-        return ehrdto;
+        return episodesDTOList;
     }
 
-    private void saveAccessLog(String consent_id,String patient_id,String doctor_id){
+    private void saveAccessLog(String consent_id,String patient_id,String doctor_id,String purpose){
         Access_logs access_logs=new Access_logs();
         access_logs.setPatient_id(patient_id);
         access_logs.setDoctor_id(doctor_id);
+        access_logs.setAccess_purpose(purpose);
         access_logs.setCreated_dt(new Date());
         access_logs.setConsent_id(consent_id);
         long id=generateID();
@@ -483,6 +551,11 @@ public class HospitalAppService {
     public String addRecordEhr(AddEhrDto addEhrDto,String doctor_id){
         String ehrId=fetchEhrIdByPatientId(addEhrDto.getPatient_id());
         Episodes_info episode=episodes_info_repo.getEpisodeByCode(addEhrDto.getEpisode(),ehrId);
+        boolean updateMappingTable=false;
+        List<Encounter_info> encounter_infoList= encounter_info_repo.getEncountersByPatientId(addEhrDto.getPatient_id());
+        if(encounter_infoList==null || encounter_infoList.size()==0){
+            updateMappingTable=true;
+        }
         if(episode==null){
             episode=new Episodes_info();
             episode.setEpisode_code(addEhrDto.getEpisode());
@@ -525,7 +598,23 @@ public class HospitalAppService {
         }
         op_record_info.setRecord_details(jsonRecord);
         op_record_info_repo.save(op_record_info);
+        if(updateMappingTable){
+            callMappingTableApi(addEhrDto.getPatient_id());
+        }
         return "Success";
+    }
+
+    private void callMappingTableApi(String patient_id){
+        String token=getCentralServerToken();
+        token="Bearer " + token;
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers=new HttpHeaders();
+        List<String> l=new ArrayList<>();
+        l.add(token);
+        headers.put("Authorization",l);
+        HttpEntity<?> httpEntity = new HttpEntity<>(headers);
+        String url=centralDbServerUrl +"/update-mapping/"+patient_id+"/"+hospital_id;
+        ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.POST,httpEntity,String.class);
     }
 
     public String sendOtp(String id){
@@ -533,7 +622,7 @@ public class HospitalAppService {
             PatientDto patientDto=getPatientById(id);
             if(patientDto!=null){
                 Integer otp= otpService.generateOTP(id);
-                emailService.sendEmail(patientDto.getPatient_email(),String.valueOf(otp));
+                emailService.sendEmail(patientDto.getPatient_email(),String.valueOf(otp),false);
                 return "Success";
             }
         }
@@ -541,7 +630,7 @@ public class HospitalAppService {
             Doctor_login_info doctor_login_info=getDoctorById(id);
             if(doctor_login_info!=null){
                 Integer otp= otpService.generateOTP(id);
-                emailService.sendEmail(doctor_login_info.getDoctor_email(),String.valueOf(otp));
+                emailService.sendEmail(doctor_login_info.getDoctor_email(),String.valueOf(otp),true);
                 return "Success";
             }
         }
@@ -598,14 +687,29 @@ public class HospitalAppService {
             date=dateFormat.format(accessLog.getCreated_dt());
             accessLogDto.setTimestamp(date);
             accessLogDto.setHospital_name(hospitalName);
+            accessLogDto.setAccess_purpose(accessLog.getAccess_purpose());
             accessLogDtoList.add(accessLogDto);
         }
         return accessLogDtoList;
     }
 
+    public HospitalDto getHospitalById(String id){
+        String token=getCentralServerToken();
+        token="Bearer " + token;
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders headers=new HttpHeaders();
+        List<String> l=new ArrayList<>();
+        l.add(token);
+        headers.put("Authorization",l);
+        HttpEntity<?> httpEntity = new HttpEntity<>(headers);
+        String url=centralDbServerUrl + "/get-hospital/"+id;
+        ResponseEntity<HospitalDto> response=restTemplate.exchange(url,HttpMethod.GET,httpEntity,HospitalDto.class);
+        return response.getBody();
+    }
+
     public String delegateconsentservice(String doctorId,String consentId,String loggedInDoctor){
         RestTemplate restTemplate=new RestTemplate();
-        String delegateURL=delegateConsentURL+ doctorId+consentId;
+        String delegateURL=delegateConsentURL+ "/"+doctorId+"/"+consentId;
         String consentToken=getToken();
         HttpHeaders httpHeaders=new HttpHeaders();
         HttpEntity<?> httpEntity=new HttpEntity<>(httpHeaders);

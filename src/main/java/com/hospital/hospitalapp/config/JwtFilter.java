@@ -1,5 +1,6 @@
 package com.hospital.hospitalapp.config;
 
+import com.hospital.hospitalapp.DTO.HospitalDto;
 import com.hospital.hospitalapp.DTO.PatientDto;
 import com.hospital.hospitalapp.entity.Doctor_login_info;
 import com.hospital.hospitalapp.service.HospitalAppService;
@@ -61,6 +62,14 @@ public class JwtFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken ut=new UsernamePasswordAuthenticationToken(adminUsername,null,null);
                     ut.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(ut);
+                }
+                else{
+                    HospitalDto hospitalDto= hospitalAppService.getHospitalById(id);
+                    if(hospitalDto!=null){
+                        UsernamePasswordAuthenticationToken ut=new UsernamePasswordAuthenticationToken(hospitalDto,null,null);
+                        ut.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+                        SecurityContextHolder.getContext().setAuthentication(ut);
+                    }
                 }
 
             }
