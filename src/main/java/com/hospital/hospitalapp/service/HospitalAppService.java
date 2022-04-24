@@ -261,6 +261,7 @@ public class HospitalAppService {
         }
         ehrdto.setEpisodesDTOList(episodesDTOList);
         ehrdto.setEhr_id(fetchEhrIdByPatientId(patient_id));
+        System.out.println(ehrdto.getEpisodesDTOList());
         return ehrdto;
     }
 
@@ -299,12 +300,14 @@ public class HospitalAppService {
             List<EncountersDTO> encountersDTOList=new ArrayList<>();
             System.out.print("Encounter:"+episodesDetails.getEncounterDetails().size());
             for(EncounterDetails encounterDetails:episodesDetails.getEncounterDetails()){
+                System.out.println("Encounter ID:"+encounterDetails.getEncounterId());
                 EncountersDTO encountersDTO=new EncountersDTO();
                 encountersDTO.setEncounterId(encounterDetails.getEncounterId());
                 List<Op_Record_info> ops_recordsList=op_record_info_repo.getOpRecords(encounterDetails.getEncounterId());
                 System.out.println("Db list size:"+ops_recordsList.size());
                 List<Ops_recordsDTO> ops_recordsDTOList=new ArrayList<>();
                 for(Op_Record_info op_record_info:ops_recordsList){
+                    System.out.println("OP record ID:"+op_record_info.getOp_record_id());
                     Ops_recordsDTO ops_recordsDTO=new Ops_recordsDTO();
                     ops_recordsDTO.setOp_record_id(op_record_info.getOp_record_id());
                     ops_recordsDTO.setDiagnosis(op_record_info.getDiagnosis());
@@ -477,7 +480,6 @@ public class HospitalAppService {
         HttpEntity<?> httpEntity = new HttpEntity<>(doctorRegistrationDto,headers);
         String url=centralDbServerUrl + "/register-doctor";
         ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.POST,httpEntity,String.class);
-
         return response.getBody();
         //check if the doctor with the entered id and email exist or not
         /*String ret_email = doctor_info_repo.findDoctor(id,email);
@@ -534,6 +536,9 @@ public class HospitalAppService {
     public String createLogin(CreateLoginDto createLoginDto){
         DoctorDto doctorDto=fetchDoctorInfoFromCentral(createLoginDto.getDoctor_id());
         if(doctorDto!=null){
+            if(doctorDto.getDoctor_name()==null){
+                return null;
+            }
             Doctor_login_info doctor_login_info=new Doctor_login_info();
             doctor_login_info.setDoctor_id(createLoginDto.getDoctor_id());
             doctor_login_info.setDoctor_email(createLoginDto.getUsername());
@@ -717,7 +722,7 @@ public class HospitalAppService {
         List<String> tokens=new ArrayList<>();
         tokens.add(finalToken);
         httpHeaders.put("Authorization",tokens);
-        ResponseEntity<String> patientId=restTemplate.exchange(delegateURL, HttpMethod.GET, httpEntity, String.class);
+        ResponseEntity<String> patientId=restTemplate.exchange(delegateURL, HttpMethod.POST, httpEntity, String.class);
         PatientDto patient=getPatientById(patientId.getBody());
         String email=patient.getPatient_email();
         DoctorDto delegatedDoctorDto=fetchDoctorInfoFromCentral(doctorId);
