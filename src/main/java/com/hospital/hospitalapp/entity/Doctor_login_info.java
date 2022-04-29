@@ -21,4 +21,6 @@ public class Doctor_login_info {
     private String doctor_password;
 
     private String is_verified;
+
+    private String is_admin_verified;
 }

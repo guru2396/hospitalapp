@@ -284,10 +284,21 @@ public class HospitalAppService {
     }
 
     public EHRDTO getEhrRecords(RequestEhrDto requestEhrDto){
+        String consentToken = getToken();
+        RestTemplate restTemplate = new RestTemplate();
+        HttpHeaders httpHeaders = new HttpHeaders();
+        HttpEntity<?> httpEntity = new HttpEntity<>(httpHeaders);
+        String finalToken = "Bearer " + consentToken;
+        List<String> tokens = new ArrayList<>();
+        tokens.add(finalToken);
+        httpHeaders.put("Authorization", tokens);
+        ResponseEntity<ValidateConsentDTO> validateConsent = restTemplate.exchange(validateConsentURL+"/"+requestEhrDto.getConsent_id(), HttpMethod.POST, httpEntity, ValidateConsentDTO.class);
         EHRDTO ehrdto=new EHRDTO();
-        List<EpisodesDTO> episodesDTOList=fetchEhrFromDb(requestEhrDto.getEpisodes());
-        ehrdto.setEpisodesDTOList(episodesDTOList);
-        saveAccessLog(requestEhrDto.getConsent_id(),requestEhrDto.getPatient_id(),requestEhrDto.getDoctor_id(),requestEhrDto.getPurpose());
+        if(validateConsent.getStatusCodeValue()==200){
+            List<EpisodesDTO> episodesDTOList=fetchEhrFromDb(requestEhrDto.getEpisodes());
+            ehrdto.setEpisodesDTOList(episodesDTOList);
+            saveAccessLog(requestEhrDto.getConsent_id(),requestEhrDto.getPatient_id(),requestEhrDto.getDoctor_id(),requestEhrDto.getPurpose());
+        }
         return ehrdto;
     }
 
@@ -480,6 +491,10 @@ public class HospitalAppService {
         HttpEntity<?> httpEntity = new HttpEntity<>(doctorRegistrationDto,headers);
         String url=centralDbServerUrl + "/register-doctor";
         ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.POST,httpEntity,String.class);
+        if(response.getStatusCodeValue()==200){
+            int otp=otpService.generateOTP(doctorRegistrationDto.getDoctor_id());
+            emailService.sendEmail(doctorRegistrationDto.getDoctor_email(),String.valueOf(otp),true);
+        }
         return response.getBody();
         //check if the doctor with the entered id and email exist or not
         /*String ret_email = doctor_info_repo.findDoctor(id,email);
@@ -499,6 +514,28 @@ public class HospitalAppService {
         }*/
 
 
+    }
+
+    public String validateOtpRegister(String doctorId,String otp){
+        int storedOtp=otpService.getOtp(doctorId);
+        int intOtp=Integer.parseInt(otp);
+        if(storedOtp!=0){
+            if(storedOtp==intOtp){
+                RestTemplate restTemplate = new RestTemplate();
+                HttpHeaders headers=new HttpHeaders();
+                String token=getCentralServerToken();
+                token="Bearer " + token;
+                List<String> l=new ArrayList<>();
+                l.add(token);
+                headers.put("Authorization",l);
+                HttpEntity<?> httpEntity=new HttpEntity<>(headers);
+                String url=centralDbServerUrl + "/approve-doctor/" + doctorId;
+                ResponseEntity<String> response=restTemplate.exchange(url,HttpMethod.POST,httpEntity,String.class);
+                return "Success";
+            }
+            return null;
+        }
+        return null;
     }
 
     public String loginDoctor(AuthRequestDTO authRequestDTO){
@@ -546,6 +583,7 @@ public class HospitalAppService {
             doctor_login_info.setDoctor_password(hash_password);
             doctor_login_info.setDoctor_name(doctorDto.getDoctor_name());
             doctor_login_info.setIs_verified("N");
+            doctor_login_info.setIs_admin_verified("N");
             doctor_login_info_repo.save(doctor_login_info);
             sendOtp(createLoginDto.getDoctor_id());
             return "success";
@@ -731,5 +769,44 @@ public class HospitalAppService {
         emailService.sendDelegateEmail(email,consentId,doctorDto.getDoctor_name(),delegatedDoctorDto.getDoctor_name());
         //String doctor=
         return "Delegation of consent successful";
+    }
+
+    public List<DoctorLoginRequestDto> getDoctorLoginRequests(){
+        List<DoctorLoginRequestDto> doctorLoginRequestDtoList=new ArrayList<>();
+        List<Doctor_login_info> doctor_login_infoList= doctor_login_info_repo.getDoctorLoginRequests();
+        if(doctor_login_infoList!=null){
+            for(Doctor_login_info doctor_login_info:doctor_login_infoList){
+                DoctorLoginRequestDto doctorLoginRequestDto=new DoctorLoginRequestDto();
+                doctorLoginRequestDto.setDoctor_id(doctor_login_info.getDoctor_id());
+                doctorLoginRequestDto.setDoctor_name(doctor_login_info.getDoctor_name());
+                doctorLoginRequestDto.setDoctor_email(doctor_login_info.getDoctor_email());
+                doctorLoginRequestDtoList.add(doctorLoginRequestDto);
+            }
+        }
+        return doctorLoginRequestDtoList;
+    }
+
+    public String acceptLoginRequest(String doctorId){
+        System.out.println("Accept login service");
+        Doctor_login_info doctor_login_info=doctor_login_info_repo.getLoginInfoById(doctorId);
+        if(doctor_login_info!=null){
+            System.out.println("Doctor found");
+            doctor_login_info.setIs_admin_verified("Y");
+            doctor_login_info_repo.save(doctor_login_info);
+            emailService.sendLoginRequestEmail(doctor_login_info.getDoctor_email(),true);
+            return "Success";
+        }
+        return null;
+    }
+
+    public String rejectLoginRequest(String doctorId){
+        Doctor_login_info doctor_login_info=doctor_login_info_repo.getLoginInfoById(doctorId);
+        if(doctor_login_info!=null){
+            String email=doctor_login_info.getDoctor_email();
+            doctor_login_info_repo.delete(doctor_login_info);
+            emailService.sendLoginRequestEmail(email,false);
+            return "Success";
+        }
+        return null;
     }
 }

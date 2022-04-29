@@ -124,6 +124,7 @@ public class HospitalAppController {
 
     @PostMapping(value = "/create-login")
     public ResponseEntity<?> createLogin(@RequestBody CreateLoginDto createLoginDto){
+        System.out.println("Inside");
         String msg= hospitalAppService.createLogin(createLoginDto);
         if(msg==null){
             ResponseEntity<String> response=new ResponseEntity<>("Doctor not found",HttpStatus.NOT_FOUND);
@@ -191,5 +192,35 @@ public class HospitalAppController {
         ResponseEntity<String> response=new ResponseEntity<>("Unauthorized",HttpStatus.UNAUTHORIZED);
         return response;
     }
+
+    @GetMapping(value = "/get-doctor-login-requests")
+    public ResponseEntity<?> getDoctorLoginRequests(){
+        List<DoctorLoginRequestDto> doctorLoginRequestDtoList= hospitalAppService.getDoctorLoginRequests();
+        return ResponseEntity.ok(doctorLoginRequestDtoList);
+    }
+
+    @PostMapping(value = "/accept-login-request/{doctorId}")
+    public ResponseEntity<?> acceptLoginRequest(@PathVariable("doctorId") String doctorId){
+        System.out.println("Accept login request controller");
+        String status=hospitalAppService.acceptLoginRequest(doctorId);
+        return ResponseEntity.ok(status);
+    }
+
+    @PostMapping(value = "/reject-login-request/{doctorId}")
+    public ResponseEntity<?> rejectLoginRequest(@PathVariable("doctorId") String doctorId){
+        String status=hospitalAppService.rejectLoginRequest(doctorId);
+        return ResponseEntity.ok(status);
+    }
+
+    @PostMapping(value = "/validate-otp-register/{doctorId}/{otp}")
+    public ResponseEntity<?> validateOtpRegister(@PathVariable("doctorId") String doctorId,@PathVariable("otp") String otp){
+        String status= hospitalAppService.validateOtpRegister(doctorId,otp);
+        if(status==null){
+            ResponseEntity<String> response=new ResponseEntity<>("Wrong otp",HttpStatus.UNAUTHORIZED);
+            return response;
+        }
+        return ResponseEntity.ok(status);
+    }
+
 
 }

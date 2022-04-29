@@ -60,4 +60,27 @@ public class EmailService {
         javaMailSender.send(mailMessage);
     }
 
+    public void sendLoginRequestEmail(String email,boolean isAccept){
+        javaMailSender.setPort(587);
+        javaMailSender.setHost("smtp.gmail.com");
+        javaMailSender.setUsername(myEmail);
+        javaMailSender.setPassword(myPassword);
+        Properties properties=javaMailSender.getJavaMailProperties();
+        properties.put("mail.smtp.starttls.enable", "true");
+        properties.put("mail.smtp.auth", "true");
+        SimpleMailMessage mailMessage=new SimpleMailMessage();
+        mailMessage.setTo(email);
+        mailMessage.setSubject(" Create Login Request ");
+        String text="";
+        if(isAccept){
+            text="Admin has accepted your create login request. You can login now.";
+        }
+        else{
+            text="Admin has rejected your create login request. Please contact the admin.";
+        }
+        mailMessage.setText(text);
+        mailMessage.setFrom(myEmail);
+        javaMailSender.send(mailMessage);
+    }
+
 }
