@@ -1,4 +1,4 @@
-package com.hospital.hospitalapp.central.entity;
+package com.hospital.hospitalapp.entity;
 
 import lombok.Data;
 
@@ -8,25 +8,24 @@ import javax.persistence.Table;
 import java.util.Date;
 
 @Entity
-@Table(name="consent_request")
+@Table(name="access_logs")
 @Data
-public class Consent_request {
+public class Access_logs {
 
     @Id
-    private String consent_request_id;
+    private String access_log_id;
 
     private String patient_id;
 
     private String doctor_id;
 
-    private String hospital_id;
+    private String consent_id;
 
-    private String request_info;
+    private String ehr_id;
 
     private String access_purpose;
 
-    private String request_status;
+    private String records_accessed;
 
     private Date created_dt;
-
 }
